@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+build/
+dist/
+
+# Trained models and raw training logs (large / regenerable)
+models/
+runs/
+*.zip
+*.pt
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
