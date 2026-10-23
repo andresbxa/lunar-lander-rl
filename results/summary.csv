@@ -1,0 +1,2 @@
+agent,train_seed,condition,n_episodes,n_seeds,mean_return,std_return,std_over,success_rate,mean_length,truncated_rate
+random,na,no_wind,100,1,-194.266,121.409,episodes,0.000,90.410,0.000
