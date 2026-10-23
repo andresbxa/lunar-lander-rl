@@ -1,0 +1,33 @@
+name: sb3_ppo
+seeds:
+- 0
+- 1
+- 2
+env:
+  enable_wind: false
+  wind_power: 15.0
+  turbulence_power: 1.5
+train:
+  total_timesteps: 1000000
+  n_envs: 16
+  device: cpu
+  torch_threads: 1
+eval:
+  freq: 32768
+  n_episodes: 10
+  seed_start: 1000
+ppo:
+  learning_rate: 0.0003
+  n_steps: 1024
+  batch_size: 64
+  n_epochs: 4
+  gamma: 0.999
+  gae_lambda: 0.98
+  clip_range: 0.2
+  ent_coef: 0.01
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+  policy_kwargs:
+    net_arch:
+    - 64
+    - 64
