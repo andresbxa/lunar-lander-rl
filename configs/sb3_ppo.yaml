@@ -1,0 +1,36 @@
+# Stable-Baselines3 PPO baseline for LunarLander-v3 (discrete actions).
+# Hyperparameters follow the tuned RL Baselines3 Zoo config for LunarLander,
+# so the reference baseline is strong rather than a strawman.
+
+name: sb3_ppo
+seeds: [0, 1, 2]             # training seeds (network init, exploration, training terrains)
+
+env:
+  enable_wind: false
+  wind_power: 15.0
+  turbulence_power: 1.5
+
+train:
+  total_timesteps: 1_000_000 # SB3 rounds up to whole rollouts: 62 x 16384 = 1,015,808
+  n_envs: 16                # parallel envs -> more diverse, less correlated rollouts
+  device: cpu                # small MLP: CPU beats GPU (host<->device copies dominate)
+  torch_threads: 1           # avoids thread oversubscription when seeds run in parallel
+
+eval:                        # periodic validation, used ONLY to pick the best checkpoint
+  freq: 32_768               # env steps between evaluations = 2 PPO rollouts (2 x 16 envs x 1024)
+  n_episodes: 10
+  seed_start: 1000           # validation seeds 1000..1009 (disjoint from test seeds 10000+)
+
+ppo:
+  learning_rate: 3.0e-4
+  n_steps: 1024              # steps per env per rollout -> 16 * 1024 = 16384 samples / update
+  batch_size: 64
+  n_epochs: 4                # passes over each rollout
+  gamma: 0.999               # long episodes, landing bonus arrives late -> long horizon
+  gae_lambda: 0.98           # bias/variance trade-off of advantage estimates
+  clip_range: 0.2
+  ent_coef: 0.01             # entropy bonus keeps exploring early on
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+  policy_kwargs:
+    net_arch: [64, 64]
