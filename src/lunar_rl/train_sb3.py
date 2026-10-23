@@ -46,8 +46,9 @@ class PeriodicEvalCallback(BaseCallback):
     """
 
     def __init__(self, eval_freq: int, n_episodes: int, seed_start: int, env_kwargs: dict[str, Any],
-                 best_model_path: Path, curve_path: Path):
+                 best_model_path: Path, curve_path: Path, tag: str = ""):
         super().__init__()
+        self.tag = tag
         self.eval_freq = eval_freq
         self.n_episodes = n_episodes
         self.seed_start = seed_start
@@ -76,8 +77,8 @@ class PeriodicEvalCallback(BaseCallback):
             self.model.save(self.best_model_path)
         self.logger.record("eval/best_mean_return", self.best_mean)
         self.logger.dump(self.num_timesteps)
-        log.info("step %8d | val return %7.1f +/- %5.1f | success %3.0f%% | best %7.1f%s",
-                 self.num_timesteps, stats["mean_return"], stats["std_return"],
+        log.info("%s step %8d | val return %7.1f +/- %5.1f | success %3.0f%% | best %7.1f%s",
+                 self.tag, self.num_timesteps, stats["mean_return"], stats["std_return"],
                  100 * stats["success_rate"], self.best_mean, "  *saved*" if is_best else "")
 
     def _on_training_start(self) -> None:
@@ -119,7 +120,8 @@ def train_one(cfg: dict[str, Any], seed: int, progress_bar: bool = True) -> dict
     model = PPO("MlpPolicy", vec_env, seed=seed, device=train_cfg.get("device", "cpu"),
                 tensorboard_log=str(Path("runs") / name), verbose=0, **cfg["ppo"])
     callback = PeriodicEvalCallback(eval_cfg["freq"], eval_cfg["n_episodes"], eval_cfg["seed_start"],
-                                    cfg["env"], model_dir / "best_model", curve_path)
+                                    cfg["env"], model_dir / "best_model", curve_path,
+                                    tag=f"[seed {seed}]")
 
     log.info("Training %s seed %d for %d steps", name, seed, train_cfg["total_timesteps"])
     t0 = time.perf_counter()
