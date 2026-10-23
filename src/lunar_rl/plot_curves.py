@@ -79,13 +79,16 @@ def plot(algos: list[str], curves_dir: Path, out: Path, random_csv: Path | None)
                     va="center", color=TEXT, fontsize=9)
 
     ax.axhline(SOLVED_THRESHOLD, color=TEXT_MUTED, lw=1, ls="--", zorder=1)
-    ax.annotate(f"solved ({SOLVED_THRESHOLD:.0f})", (0, SOLVED_THRESHOLD), xytext=(4, 4),
-                textcoords="offset points", color=TEXT_MUTED, fontsize=8.5)
+    # Reference labels sit at the right edge (x in axes coords), where the learning
+    # curves are far from them: "solved" just below its line, "random" just above.
+    ref = ax.get_yaxis_transform()
+    ax.annotate(f"solved ({SOLVED_THRESHOLD:.0f})", (0.99, SOLVED_THRESHOLD), xycoords=ref, xytext=(0, -4),
+                textcoords="offset points", ha="right", va="top", color=TEXT_MUTED, fontsize=8.5)
     if random_csv is not None and random_csv.exists():
         rand = pd.read_csv(random_csv)["return"].mean()
         ax.axhline(rand, color=TEXT_MUTED, lw=1, ls=":", zorder=1)
-        ax.annotate(f"random agent ({rand:.0f})", (0, rand), xytext=(4, 4), textcoords="offset points",
-                    color=TEXT_MUTED, fontsize=8.5)
+        ax.annotate(f"random agent ({rand:.0f})", (0.99, rand), xycoords=ref, xytext=(0, 4),
+                    textcoords="offset points", ha="right", va="bottom", color=TEXT_MUTED, fontsize=8.5)
 
     title = "LunarLander-v3: validation return during training"
     if len(algos) == 1:
