@@ -28,6 +28,13 @@ log = get_logger("plot_curves")
 
 # Categorical slots in fixed order (one per algorithm), plus neutral inks.
 SERIES_COLORS = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100"]
+# Each algorithm keeps the same color in every figure; unknown names take the free slots in order.
+ALGO_COLORS = {"dqn": SERIES_COLORS[0], "sb3_ppo": SERIES_COLORS[1], "ppo": SERIES_COLORS[2]}
+
+
+def algo_colors(algos: list[str]) -> list[str]:
+    free = [c for c in SERIES_COLORS if c not in {ALGO_COLORS.get(a) for a in algos}]
+    return [ALGO_COLORS.get(a) or free.pop(0) for a in algos]
 SURFACE, TEXT, TEXT_MUTED, GRID = "#fcfcfb", "#0b0b0b", "#6b6a66", "#e6e5e1"
 
 
@@ -74,7 +81,8 @@ def _place_side_labels(ax, labels: list[tuple[float, str, str]], fontsize: float
                     annotation_clip=False)
 
 
-def plot(algos: list[str], curves_dir: Path, out: Path, random_csv: Path | None) -> None:
+def plot(algos: list[str], curves_dir: Path, out: Path, random_csv: Path | None,
+         ymin: float | None = None) -> None:
     plt.rcParams.update({"font.size": 10, "axes.edgecolor": GRID, "axes.labelcolor": TEXT_MUTED,
                          "xtick.color": TEXT_MUTED, "ytick.color": TEXT_MUTED})
     fig, ax = plt.subplots(figsize=(7.5, 4.2), dpi=150)
@@ -83,13 +91,14 @@ def plot(algos: list[str], curves_dir: Path, out: Path, random_csv: Path | None)
 
     seed_counts = []
     side_labels: list[tuple[float, str, str]] = []  # (data y, text, color), placed right of the plot
-    for i, algo in enumerate(algos):
-        color = SERIES_COLORS[i]
+    lowest = np.inf
+    for algo, color in zip(algos, algo_colors(algos)):
         grid, returns = load_curves(curves_dir, algo)
         n = len(returns)
         seed_counts.append(n)
         mean = returns.mean(axis=0)
         std = returns.std(axis=0, ddof=1) if n > 1 else np.zeros_like(mean)
+        lowest = min(lowest, float(returns.min()), float((mean - std).min()))
         for seed_curve in returns:
             ax.plot(grid, seed_curve, color=color, lw=0.8, alpha=0.25, zorder=2)
         ax.fill_between(grid, mean - std, mean + std, color=color, alpha=0.18, lw=0, zorder=2)
@@ -118,8 +127,12 @@ def plot(algos: list[str], curves_dir: Path, out: Path, random_csv: Path | None)
     ax.margins(x=0.02)
     if len(algos) > 1:
         ax.legend(frameon=False, loc="lower right", labelcolor=TEXT)
-    fig.text(0.01, 0.01, "Line: mean across training seeds. Band: ±1 std across seeds. Thin lines: individual seeds.",
-             color=TEXT_MUTED, fontsize=7.5)
+    note = "Line: mean across training seeds. Band: ±1 std across seeds. Thin lines: individual seeds."
+    if ymin is not None and lowest < ymin:
+        # Clip rare early dips so they do not squash the interesting range, and say so.
+        ax.set_ylim(bottom=ymin)
+        note += f" Y-axis clipped at {ymin:g} (lowest value: {lowest:.0f})."
+    fig.text(0.01, 0.01, note, color=TEXT_MUTED, fontsize=7.5)
 
     fig.tight_layout(rect=(0, 0.03, 0.84, 1))  # right margin holds the side labels
     _place_side_labels(ax, side_labels)
@@ -135,11 +148,12 @@ def main() -> None:
     p.add_argument("--curves-dir", type=Path, default=Path("results/curves"))
     p.add_argument("--random-csv", type=Path, default=Path("results/eval/random_no_wind.csv"))
     p.add_argument("--out", type=Path, default=None)
+    p.add_argument("--ymin", type=float, default=None, help="Clip the y-axis below this value (noted on the figure).")
     args = p.parse_args()
     if len(args.algo) > len(SERIES_COLORS):
         raise SystemExit(f"At most {len(SERIES_COLORS)} algorithms per figure; split into several plots.")
     out = args.out or Path("results/figures") / f"learning_curve_{'_vs_'.join(args.algo)}.png"
-    plot(args.algo, args.curves_dir, out, args.random_csv)
+    plot(args.algo, args.curves_dir, out, args.random_csv, args.ymin)
 
 
 if __name__ == "__main__":
