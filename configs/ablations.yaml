@@ -1,0 +1,46 @@
+# Ablation suite: each variant is a base config plus overrides, changing ONE thing.
+# Variants are trained on the same seeds, selected on validation and reported on test,
+# exactly like the main results. Run with: python -m lunar_rl.ablate --variants ...
+
+variants:
+  dqn_double:
+    base: configs/dqn.yaml
+    change: Double DQN targets
+    question: Does reducing Q-value overestimation prevent the late collapses?
+    set:
+      dqn.double_dqn: true
+
+  dqn_no_target:
+    base: configs/dqn.yaml
+    change: no target network (TD targets from the online network)
+    question: How much does the target network contribute to stability?
+    set:
+      dqn.use_target_network: false
+
+  ppo_big_net:
+    base: configs/ppo.yaml
+    change: network 256-256 instead of 64-64
+    question: Does a larger network help?
+    set:
+      ppo.hidden_sizes: [256, 256]
+
+  ppo_lr_1e-4:
+    base: configs/ppo.yaml
+    change: learning rate 1e-4 instead of 3e-4
+    question: Sensitivity to a smaller learning rate
+    set:
+      ppo.learning_rate: 1.0e-4
+
+  ppo_lr_1e-3:
+    base: configs/ppo.yaml
+    change: learning rate 1e-3 instead of 3e-4
+    question: Sensitivity to a larger learning rate
+    set:
+      ppo.learning_rate: 1.0e-3
+
+  ppo_gamma_0.99:
+    base: configs/ppo.yaml
+    change: gamma 0.99 instead of 0.999
+    question: Is the long horizon (gamma=0.999) actually needed?
+    set:
+      ppo.gamma: 0.99

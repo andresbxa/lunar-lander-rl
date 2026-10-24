@@ -5,7 +5,8 @@ import pytest
 from lunar_rl.train import TRAINERS, train_seed
 from lunar_rl.utils import load_config
 
-CONFIGS = sorted(Path(__file__).parents[1].joinpath("configs").glob("*.yaml"))
+CONFIGS = sorted(p for p in Path(__file__).parents[1].joinpath("configs").glob("*.yaml")
+                 if p.name != "ablations.yaml")  # the ablation suite has its own tests
 
 
 @pytest.mark.parametrize("path", CONFIGS, ids=lambda p: p.name)
