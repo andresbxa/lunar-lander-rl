@@ -30,12 +30,12 @@ log = get_logger("plot_curves")
 SERIES_COLORS = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100"]
 # Each algorithm keeps the same color in every figure; unknown names take the free slots in order.
 ALGO_COLORS = {"dqn": SERIES_COLORS[0], "sb3_ppo": SERIES_COLORS[1], "ppo": SERIES_COLORS[2]}
+SURFACE, TEXT, TEXT_MUTED, GRID = "#fcfcfb", "#0b0b0b", "#6b6a66", "#e6e5e1"
 
 
 def algo_colors(algos: list[str]) -> list[str]:
     free = [c for c in SERIES_COLORS if c not in {ALGO_COLORS.get(a) for a in algos}]
     return [ALGO_COLORS.get(a) or free.pop(0) for a in algos]
-SURFACE, TEXT, TEXT_MUTED, GRID = "#fcfcfb", "#0b0b0b", "#6b6a66", "#e6e5e1"
 
 
 def load_curves(curves_dir: Path, algo: str) -> tuple[np.ndarray, np.ndarray]:
