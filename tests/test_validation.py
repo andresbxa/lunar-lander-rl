@@ -1,5 +1,5 @@
-import pytest
 import pandas as pd
+import pytest
 
 from lunar_rl.agents import RandomAgent
 from lunar_rl.validation import PeriodicValidator
