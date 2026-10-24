@@ -56,6 +56,24 @@ def _steps_formatter(x: float, _pos) -> str:
     return f"{x:g}"
 
 
+def _place_side_labels(ax, labels: list[tuple[float, str, str]], fontsize: float = 8.5) -> None:
+    """Write labels just right of the axes at their data y, nudged apart so none overlap."""
+    if not labels:
+        return
+    fig = ax.figure
+    min_gap_px = 1.25 * fontsize * fig.dpi / 72  # one text line plus a little air
+    to_px = ax.transData.transform
+    items = sorted(((to_px((0, y))[1], y, text, color) for y, text, color in labels))
+    placed: list[float] = []
+    for px, *_ in items:
+        placed.append(max(px, placed[-1] + min_gap_px) if placed else px)
+    for (px, y, text, color), new_px in zip(items, placed):
+        dy_pt = (new_px - px) * 72 / fig.dpi
+        ax.annotate(text, (1.0, y), xycoords=ax.get_yaxis_transform(), xytext=(6, dy_pt),
+                    textcoords="offset points", va="center", ha="left", color=color, fontsize=fontsize,
+                    annotation_clip=False)
+
+
 def plot(algos: list[str], curves_dir: Path, out: Path, random_csv: Path | None) -> None:
     plt.rcParams.update({"font.size": 10, "axes.edgecolor": GRID, "axes.labelcolor": TEXT_MUTED,
                          "xtick.color": TEXT_MUTED, "ytick.color": TEXT_MUTED})
@@ -64,6 +82,7 @@ def plot(algos: list[str], curves_dir: Path, out: Path, random_csv: Path | None)
     ax.set_facecolor(SURFACE)
 
     seed_counts = []
+    side_labels: list[tuple[float, str, str]] = []  # (data y, text, color), placed right of the plot
     for i, algo in enumerate(algos):
         color = SERIES_COLORS[i]
         grid, returns = load_curves(curves_dir, algo)
@@ -75,20 +94,14 @@ def plot(algos: list[str], curves_dir: Path, out: Path, random_csv: Path | None)
             ax.plot(grid, seed_curve, color=color, lw=0.8, alpha=0.25, zorder=2)
         ax.fill_between(grid, mean - std, mean + std, color=color, alpha=0.18, lw=0, zorder=2)
         ax.plot(grid, mean, color=color, lw=2, zorder=3, label=f"{algo} (n={n} seeds)")
-        ax.annotate(f"{mean[-1]:.0f}", (grid[-1], mean[-1]), xytext=(6, 0), textcoords="offset points",
-                    va="center", color=TEXT, fontsize=9)
+        side_labels.append((mean[-1], f"{algo}: {mean[-1]:.0f}" if len(algos) > 1 else f"{mean[-1]:.0f}", TEXT))
 
     ax.axhline(SOLVED_THRESHOLD, color=TEXT_MUTED, lw=1, ls="--", zorder=1)
-    # Reference labels sit at the right edge (x in axes coords), where the learning
-    # curves are far from them: "solved" just below its line, "random" just above.
-    ref = ax.get_yaxis_transform()
-    ax.annotate(f"solved ({SOLVED_THRESHOLD:.0f})", (0.99, SOLVED_THRESHOLD), xycoords=ref, xytext=(0, -4),
-                textcoords="offset points", ha="right", va="top", color=TEXT_MUTED, fontsize=8.5)
+    side_labels.append((SOLVED_THRESHOLD, f"solved ({SOLVED_THRESHOLD:.0f})", TEXT_MUTED))
     if random_csv is not None and random_csv.exists():
         rand = pd.read_csv(random_csv)["return"].mean()
         ax.axhline(rand, color=TEXT_MUTED, lw=1, ls=":", zorder=1)
-        ax.annotate(f"random agent ({rand:.0f})", (0.99, rand), xycoords=ref, xytext=(0, 4),
-                    textcoords="offset points", ha="right", va="bottom", color=TEXT_MUTED, fontsize=8.5)
+        side_labels.append((rand, f"random ({rand:.0f})", TEXT_MUTED))
 
     title = "LunarLander-v3: validation return during training"
     if len(algos) == 1:
@@ -108,7 +121,8 @@ def plot(algos: list[str], curves_dir: Path, out: Path, random_csv: Path | None)
     fig.text(0.01, 0.01, "Line: mean across training seeds. Band: ±1 std across seeds. Thin lines: individual seeds.",
              color=TEXT_MUTED, fontsize=7.5)
 
-    fig.tight_layout(rect=(0, 0.03, 1, 1))
+    fig.tight_layout(rect=(0, 0.03, 0.84, 1))  # right margin holds the side labels
+    _place_side_labels(ax, side_labels)
     out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out, facecolor=SURFACE)
     plt.close(fig)
