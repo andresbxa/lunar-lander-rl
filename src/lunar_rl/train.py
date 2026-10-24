@@ -22,6 +22,7 @@ log = get_logger("train")
 TRAINERS = {
     "sb3_ppo": "lunar_rl.train_sb3",
     "dqn": "lunar_rl.train_dqn",
+    "ppo": "lunar_rl.train_ppo",
 }
 
 

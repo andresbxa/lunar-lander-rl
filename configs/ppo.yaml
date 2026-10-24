@@ -1,0 +1,38 @@
+# PPO implemented from scratch (src/lunar_rl/agents/ppo.py).
+# Same hyperparameters, budget and seeds as configs/sb3_ppo.yaml, so any
+# difference against the SB3 baseline comes from the implementation.
+
+name: ppo
+algo: ppo
+seeds: [0, 1, 2]
+
+env:
+  enable_wind: false
+  wind_power: 15.0
+  turbulence_power: 1.5
+
+train:
+  total_timesteps: 1_000_000 # rounded up to whole rollouts: 62 x 16384 = 1,015,808 (as in SB3)
+  n_envs: 16
+  device: cpu
+  torch_threads: 1
+
+eval:                        # periodic validation, used ONLY to pick the best checkpoint
+  freq: 32_768               # = 2 rollouts, evaluated right after a policy update
+  n_episodes: 10
+  seed_start: 1000
+
+ppo:
+  hidden_sizes: [64, 64]
+  learning_rate: 3.0e-4
+  n_steps: 1024
+  batch_size: 64
+  n_epochs: 4
+  gamma: 0.999
+  gae_lambda: 0.98
+  clip_range: 0.2
+  ent_coef: 0.01
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+  normalize_advantage: true
+  adam_eps: 1.0e-5
