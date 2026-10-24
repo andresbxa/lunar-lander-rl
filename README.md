@@ -1,5 +1,7 @@
 ﻿# lunar-lander-rl
 
+[![tests](https://github.com/andresbxa/lunar-lander-rl/actions/workflows/tests.yml/badge.svg)](https://github.com/andresbxa/lunar-lander-rl/actions/workflows/tests.yml)
+
 **Deep Q-Networks and Proximal Policy Optimization implemented from scratch in PyTorch to solve Gymnasium's `LunarLander-v3`, with multi-seed evaluation, ablations and robustness tests.**
 
 | Random agent | DQN (from scratch) |
@@ -70,7 +72,25 @@ Other figures: [PPO (ours) vs SB3 PPO](results/figures/learning_curve_ppo_vs_sb3
 
 ### Robustness to wind
 
-<!-- TODO phase 4: agents trained without wind, evaluated with enable_wind=True at increasing wind_power / turbulence_power. -->
+All agents were trained **without wind** and then evaluated, without retraining, on the same 100 test episodes under increasing wind. With the same episode seed every agent faces exactly the same gusts, so the comparison between algorithms is paired.
+
+![Robustness to wind](results/figures/robustness_wind.png)
+
+Mean test return ± std across the 3 training seeds (success rate in parentheses):
+
+| Wind / turbulence power | DQN (ours) | PPO (ours) | SB3 PPO |
+|---|---:|---:|---:|
+| none | 232.0 ± 61.0 (88%) | 260.4 ± 9.6 (100%) | 258.7 ± 4.5 (100%) |
+| 5 / 0.5 | 214.6 ± 70.0 (81%) | 249.9 ± 11.1 (96%) | 240.7 ± 3.4 (93%) |
+| 10 / 1.0 | 167.7 ± 71.9 (65%) | 194.3 ± 22.1 (75%) | 186.0 ± 14.2 (75%) |
+| 15 / 1.5 | 68.1 ± 44.4 (35%) | 123.6 ± 35.5 (47%) | 84.3 ± 44.0 (44%) |
+| 20 / 2.0 | -23.1 ± 22.2 (19%) | 13.3 ± 16.5 (20%) | -40.3 ± 68.2 (16%) |
+
+- **Every agent degrades sharply under distribution shift.** Light wind is tolerated, but at moderate wind (10 / 1.0) no algorithm stays above 200, and at the maximum wind only about one landing in five succeeds. None of them ever experienced wind during training.
+- **The ranking is stable across wind levels** (PPO ≳ SB3 PPO > DQN), but the gap between our PPO and SB3 is within the across-seed spread at every level, so it should not be read as "our PPO is more robust".
+- The no-wind column reproduces the main results table exactly, a consistency check of the evaluation pipeline.
+
+Raw results: [`results/robustness.csv`](results/robustness.csv) and per-episode files in [`results/eval/robustness/`](results/eval/robustness).
 
 ## Methodology
 
@@ -115,6 +135,15 @@ PPO is notoriously sensitive to implementation details (see [The 37 Implementati
 - **Truncation bootstrap.** With Gymnasium's same-step autoreset, the true last observation of an episode is available in `info["final_obs"]`. For time-limit truncations, `gamma * V(final_obs)` is added to the last reward, because GAE stops bootstrapping at every episode end. This is the PPO counterpart of DQN's `terminated` vs `truncated` distinction, and it is unit-tested.
 - Logged diagnostics: approximate KL, clip fraction, entropy, explained variance, policy and value losses.
 
+## Reproduce everything in 2 commands
+
+```bash
+uv sync
+uv run python -m lunar_rl.reproduce
+```
+
+This runs every stage of the project in order: the random baseline, training of the three algorithms (3 seeds each), test evaluation, robustness to wind, the ablation suite, all figures and the GIFs. It takes about 4–5 hours on a laptop CPU and keeps a Windows machine from going to sleep while it runs. Use `--skip-training` to regenerate results, figures and GIFs from the saved models, and `--dry-run` to print the commands without running them.
+
 ## Installation
 
 Requires Python 3.11. With [uv](https://docs.astral.sh/uv/) (recommended):
@@ -122,6 +151,8 @@ Requires Python 3.11. With [uv](https://docs.astral.sh/uv/) (recommended):
 ```bash
 uv sync
 ```
+
+On Linux, PyTorch is installed from the CPU-only index (configured in `pyproject.toml`): the models are small MLPs that train faster on CPU, and this avoids downloading about 3 GB of CUDA libraries.
 
 Or with pip:
 
@@ -152,8 +183,14 @@ python -m lunar_rl.evaluate --agent sb3_ppo --model "models/sb3_ppo/seed_*/best_
 python -m lunar_rl.evaluate --agent dqn --model "models/dqn/seed_*/best_model.pt"
 python -m lunar_rl.evaluate --agent ppo --model "models/ppo/seed_*/best_model.pt"
 
-# Evaluate under wind
+# Evaluate under wind (one condition), or the full wind sweep for all agents
 python -m lunar_rl.evaluate --agent sb3_ppo --model "models/sb3_ppo/seed_*/best_model.zip" --wind --wind-power 15 --turbulence-power 1.5
+python -m lunar_rl.robustness --workers 9
+
+# Ablations (configs/ablations.yaml): train + evaluate variants, then print the results table
+python -m lunar_rl.ablate --list
+python -m lunar_rl.ablate --variants ppo_big_net ppo_gamma_0.99 --workers 6
+python -m lunar_rl.ablate --report
 
 # Learning curve (mean ± std across seeds) -> results/figures/
 python -m lunar_rl.plot_curves --algo sb3_ppo
@@ -169,8 +206,6 @@ tensorboard --logdir runs
 pytest
 ```
 
-<!-- TODO phase 4: single "reproduce everything" command. -->
-
 ## Project structure
 
 ```
@@ -183,13 +218,16 @@ src/lunar_rl/
 ├── train_ppo.py     # PPO training loop (vectorized envs)
 ├── validation.py    # periodic validation + best checkpoint, shared by all algorithms
 ├── evaluate.py      # evaluate any agent on fixed test seeds -> CSV
+├── robustness.py    # wind sweep for agents trained without wind
+├── ablate.py        # ablation suite runner + results table
+├── reproduce.py     # every stage of the project in one command
 ├── record.py        # GIF of one episode
 ├── plot_curves.py   # learning curves across seeds
 └── utils/           # seeding protocol, config loader, logging
-configs/             # one YAML per experiment
-results/             # CSVs (curves, evaluations, summary) and figures (versioned)
+configs/             # one YAML per experiment + ablations.yaml (variants = base + one override)
+results/             # CSVs (curves, evaluations, summaries) and figures (versioned)
 assets/              # GIFs for this README
-tests/
+tests/               # unit tests + short end-to-end training runs (run on GitHub Actions)
 ```
 
 Trained models (`models/`) and TensorBoard logs (`runs/`) are not versioned; they are regenerated by the training command.
