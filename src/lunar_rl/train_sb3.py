@@ -7,18 +7,15 @@ For every training seed this produces:
 * ``runs/<name>/seed_<s>_1/``                TensorBoard logs
 * ``results/curves/<name>/seed_<s>.csv``     validation return vs. timesteps
 
-Usage::
+Usage (``lunar_rl.train_sb3`` is an alias of the generic ``lunar_rl.train``)::
 
-    python -m lunar_rl.train_sb3 --config configs/sb3_ppo.yaml                 # all seeds, sequential
-    python -m lunar_rl.train_sb3 --config configs/sb3_ppo.yaml --workers 3     # all seeds in parallel
-    python -m lunar_rl.train_sb3 --config configs/sb3_ppo.yaml --seed 0 --set train.total_timesteps=50000
+    python -m lunar_rl.train --config configs/sb3_ppo.yaml --workers 3     # all seeds in parallel
+    python -m lunar_rl.train --config configs/sb3_ppo.yaml --seed 0 --set train.total_timesteps=50000
 """
 
 from __future__ import annotations
 
-import argparse
 import time
-from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 from typing import Any
 
@@ -30,7 +27,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 
 from lunar_rl.agents.sb3_agent import SB3Agent
 from lunar_rl.envs import make_env
-from lunar_rl.utils import get_logger, load_config, save_config, set_global_seed
+from lunar_rl.utils import get_logger, save_config, set_global_seed
 from lunar_rl.validation import LOGGED_METRICS, PeriodicValidator
 
 log = get_logger("train_sb3")
@@ -109,26 +106,10 @@ def train_one(cfg: dict[str, Any], seed: int, progress_bar: bool = True) -> dict
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--config", required=True, type=Path)
-    p.add_argument("--seed", type=int, default=None, help="Train a single seed (default: all in config).")
-    p.add_argument("--workers", type=int, default=1, help="Seeds trained in parallel processes.")
-    p.add_argument("--set", nargs="*", default=[], metavar="KEY=VALUE",
-                   help="Config overrides, e.g. train.total_timesteps=50000")
-    args = p.parse_args()
+    # Kept for backwards compatibility; `python -m lunar_rl.train` is the generic entry point.
+    from lunar_rl.train import main as train_main
 
-    cfg = load_config(args.config, args.set)
-    seeds = [args.seed] if args.seed is not None else list(cfg["seeds"])
-
-    if args.workers > 1 and len(seeds) > 1:
-        with ProcessPoolExecutor(max_workers=args.workers) as pool:
-            results = list(pool.map(train_one, [cfg] * len(seeds), seeds, [False] * len(seeds)))
-    else:
-        results = [train_one(cfg, s) for s in seeds]
-
-    for r in results:
-        log.info("seed %d: %.1f min, %.0f steps/s, best val %.1f",
-                 r["seed"], r["minutes"], r["fps"], r["best_val_return"])
+    train_main()
 
 
 if __name__ == "__main__":

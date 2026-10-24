@@ -3,6 +3,7 @@
 # so the reference baseline is strong rather than a strawman.
 
 name: sb3_ppo
+algo: sb3_ppo
 seeds: [0, 1, 2]             # training seeds (network init, exploration, training terrains)
 
 env:
