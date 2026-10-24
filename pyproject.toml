@@ -34,3 +34,14 @@ packages = ["src/lunar_rl"]
 testpaths = ["tests"]
 addopts = "-q"
 filterwarnings = ["ignore:builtin type .* has no __module__ attribute:DeprecationWarning"]
+
+# CPU-only PyTorch on Linux (CI and Linux users): the default PyPI wheel pulls ~3 GB of CUDA
+# libraries that this project does not need (small MLPs train faster on CPU). Windows and
+# macOS wheels from PyPI are already CPU builds.
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true

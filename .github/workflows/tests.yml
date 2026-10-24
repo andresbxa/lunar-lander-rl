@@ -1,0 +1,23 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    env:
+      SDL_VIDEODRIVER: dummy   # headless pygame for the GIF-recording test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies (locked, CPU-only PyTorch)
+        run: uv sync --locked --python 3.11
+
+      - name: Run tests
+        run: uv run pytest
