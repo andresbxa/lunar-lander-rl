@@ -1,4 +1,8 @@
 agent,train_seed,condition,n_episodes,n_seeds,mean_return,std_return,std_over,success_rate,mean_length,truncated_rate
+dqn,0,no_wind,100,1,266.080,64.908,episodes,0.910,197.160,0.010
+dqn,1,no_wind,100,1,161.602,190.213,episodes,0.730,356.150,0.010
+dqn,2,no_wind,100,1,268.276,30.818,episodes,0.990,269.910,0.000
+dqn,all,no_wind,300,3,231.986,60.965,train_seeds,0.877,274.407,0.007
 random,na,no_wind,100,1,-194.266,121.409,episodes,0.000,90.410,0.000
 sb3_ppo,0,no_wind,100,1,259.054,30.159,episodes,0.990,323.560,0.000
 sb3_ppo,1,no_wind,100,1,254.030,20.572,episodes,1.000,363.470,0.000

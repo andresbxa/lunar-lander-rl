@@ -1,0 +1,36 @@
+name: dqn
+algo: dqn
+seeds:
+- 0
+- 1
+- 2
+env:
+  enable_wind: false
+  wind_power: 15.0
+  turbulence_power: 1.5
+train:
+  total_timesteps: 500000
+  device: cpu
+  torch_threads: 1
+  log_interval: 1000
+eval:
+  freq: 10000
+  n_episodes: 10
+  seed_start: 1000
+dqn:
+  hidden_sizes:
+  - 256
+  - 256
+  learning_rate: 0.00063
+  gamma: 0.99
+  batch_size: 128
+  buffer_size: 50000
+  learning_starts: 10000
+  train_freq: 4
+  gradient_steps: 4
+  target_update_interval: 250
+  eps_start: 1.0
+  eps_end: 0.1
+  eps_decay_steps: 12000
+  max_grad_norm: 10.0
+  double_dqn: false
