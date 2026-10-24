@@ -5,7 +5,7 @@ from pathlib import Path
 from lunar_rl.agents.base import Agent
 from lunar_rl.agents.random_agent import RandomAgent
 
-AGENT_NAMES = ("random", "sb3_ppo", "dqn")
+AGENT_NAMES = ("random", "sb3_ppo", "dqn", "ppo")
 
 
 def load_agent(name: str, model_path: str | Path | None = None, seed: int = 0) -> Agent:
@@ -24,6 +24,12 @@ def load_agent(name: str, model_path: str | Path | None = None, seed: int = 0) -
         from lunar_rl.agents.dqn import DQNAgent
 
         return DQNAgent.load(model_path)
+    if name == "ppo":
+        if model_path is None:
+            raise ValueError("--model is required for ppo")
+        from lunar_rl.agents.ppo import PPOAgent
+
+        return PPOAgent.load(model_path)
     raise ValueError(f"Unknown agent {name!r}; choose from {AGENT_NAMES}")
 
 
