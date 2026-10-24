@@ -50,6 +50,7 @@ class DQNConfig:
     eps_decay_steps: int = 12_000        # linear decay length, in env steps
     max_grad_norm: float = 10.0
     double_dqn: bool = False
+    use_target_network: bool = True      # False: TD targets from the online net (ablation)
 
 
 class QNetwork(nn.Module):
@@ -111,7 +112,8 @@ class DQNAgent:
     def update(self, batch: Batch) -> dict[str, float]:
         """One gradient step on a replay batch; returns diagnostics."""
         q_sa = self.q(batch.obs).gather(1, batch.actions.unsqueeze(1)).squeeze(1)
-        target = td_targets(batch.rewards, batch.next_obs, batch.terminated, self.q_target,
+        target_net = self.q_target if self.cfg.use_target_network else self.q
+        target = td_targets(batch.rewards, batch.next_obs, batch.terminated, target_net,
                             self.cfg.gamma, self.q if self.cfg.double_dqn else None)
         loss = F.smooth_l1_loss(q_sa, target)
 
