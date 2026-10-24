@@ -1,0 +1,41 @@
+# DQN implemented from scratch (src/lunar_rl/agents/dqn.py).
+# Hyperparameters follow the tuned RL Baselines3 Zoo DQN config for LunarLander,
+# except: a 10k-step random warm-up before learning and a 500k-step budget
+# (the zoo uses 100k); the best checkpoint is picked on validation seeds.
+
+name: dqn
+algo: dqn
+seeds: [0, 1, 2]
+
+env:
+  enable_wind: false
+  wind_power: 15.0
+  turbulence_power: 1.5
+
+train:
+  total_timesteps: 500_000
+  device: cpu
+  torch_threads: 1
+  log_interval: 1_000        # env steps between TensorBoard scalars
+
+eval:                        # periodic validation, used ONLY to pick the best checkpoint
+  freq: 10_000
+  n_episodes: 10
+  seed_start: 1000
+
+dqn:
+  hidden_sizes: [256, 256]
+  learning_rate: 6.3e-4
+  gamma: 0.99                # effective horizon ~100 steps: enough here because LunarLander's
+                             # shaping reward (distance, speed, tilt) is dense at every step
+  batch_size: 128
+  buffer_size: 50_000        # ~50-150 episodes of experience
+  learning_starts: 10_000    # fill the buffer before the first update
+  train_freq: 4              # every 4 env steps...
+  gradient_steps: 4          # ...do 4 updates -> 1 update per env step on average
+  target_update_interval: 250
+  eps_start: 1.0
+  eps_end: 0.1
+  eps_decay_steps: 12_000
+  max_grad_norm: 10.0
+  double_dqn: false          # vanilla DQN; Double DQN is a phase-4 ablation

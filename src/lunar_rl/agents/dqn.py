@@ -128,7 +128,7 @@ class DQNAgent:
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
         torch.save({"q": self.q.state_dict(), "config": asdict(self.cfg),
-                    "obs_dim": self.obs_dim, "n_actions": self.n_actions}, path)
+                    "obs_dim": int(self.obs_dim), "n_actions": int(self.n_actions)}, path)
 
     @classmethod
     def load(cls, path: str | Path, device: str = "cpu") -> "DQNAgent":
