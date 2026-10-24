@@ -22,7 +22,6 @@ from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 from typing import Any
 
-import pandas as pd
 import torch
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import BaseCallback
@@ -31,74 +30,45 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 
 from lunar_rl.agents.sb3_agent import SB3Agent
 from lunar_rl.envs import make_env
-from lunar_rl.evaluate import evaluate, summarize
 from lunar_rl.utils import get_logger, load_config, save_config, set_global_seed
+from lunar_rl.validation import LOGGED_METRICS, PeriodicValidator
 
 log = get_logger("train_sb3")
 
 
 class PeriodicEvalCallback(BaseCallback):
-    """Evaluate on fixed validation seeds every ``eval_freq`` steps and keep the best model.
+    """Thin SB3 adapter around :class:`lunar_rl.validation.PeriodicValidator`.
 
-    Unlike SB3's ``EvalCallback`` this resets every evaluation episode with an
-    explicit seed, so successive evaluations are directly comparable (same
-    terrains every time) and reuse exactly the same code path as final testing.
+    Unlike SB3's ``EvalCallback`` the validator resets every evaluation episode
+    with an explicit seed, so successive evaluations are directly comparable
+    (same terrains every time) and reuse the same code path as final testing.
     """
 
-    def __init__(self, eval_freq: int, n_episodes: int, seed_start: int, env_kwargs: dict[str, Any],
-                 best_model_path: Path, curve_path: Path, tag: str = ""):
+    def __init__(self, validator: PeriodicValidator):
         super().__init__()
-        self.tag = tag
-        self.eval_freq = eval_freq
-        self.n_episodes = n_episodes
-        self.seed_start = seed_start
-        self.env_kwargs = env_kwargs
-        self.best_model_path = best_model_path
-        self.curve_path = curve_path
-        self.best_mean = -float("inf")
-        self.next_eval = 0
-        self.rows: list[dict[str, float]] = []
-        self.t0 = time.perf_counter()
+        self.validator = validator
 
     def _run_eval(self) -> None:
-        df = evaluate(SB3Agent(self.model), self.n_episodes, self.seed_start, True, self.env_kwargs)
-        stats = summarize(df)
-        row = {"timesteps": self.num_timesteps, **stats, "wall_time_s": time.perf_counter() - self.t0}
-        self.rows.append(row)
-        # Rewrite the whole CSV each time so a crashed run still leaves a usable curve.
-        self.curve_path.parent.mkdir(parents=True, exist_ok=True)
-        pd.DataFrame(self.rows).to_csv(self.curve_path, index=False, float_format="%.3f")
-
-        for k in ("mean_return", "std_return", "success_rate", "mean_length", "truncated_rate"):
+        stats = self.validator.validate(SB3Agent(self.model), self.num_timesteps)
+        for k in (*LOGGED_METRICS, "best_mean_return"):
             self.logger.record(f"eval/{k}", stats[k])
-        is_best = stats["mean_return"] > self.best_mean
-        if is_best:
-            self.best_mean = stats["mean_return"]
-            self.model.save(self.best_model_path)
-        self.logger.record("eval/best_mean_return", self.best_mean)
         self.logger.dump(self.num_timesteps)
-        log.info("%s step %8d | val return %7.1f +/- %5.1f | success %3.0f%% | best %7.1f%s",
-                 self.tag, self.num_timesteps, stats["mean_return"], stats["std_return"],
-                 100 * stats["success_rate"], self.best_mean, "  *saved*" if is_best else "")
 
     def _on_training_start(self) -> None:
-        self.t0 = time.perf_counter()
+        self.validator.start()
         self._run_eval()  # step-0 point: the untrained policy
-        self.next_eval = self.eval_freq
 
     def _on_rollout_start(self) -> None:
         # PPO only changes its weights between rollouts, so this is the one
         # place where a new evaluation can measure a new policy.
-        if self.num_timesteps >= self.next_eval:
+        if self.validator.due(self.num_timesteps):
             self._run_eval()
-            while self.next_eval <= self.num_timesteps:
-                self.next_eval += self.eval_freq
 
     def _on_step(self) -> bool:
         return True
 
     def _on_training_end(self) -> None:
-        if not self.rows or self.rows[-1]["timesteps"] != self.num_timesteps:
+        if self.validator.last_step != self.num_timesteps:
             self._run_eval()
 
 
@@ -119,9 +89,10 @@ def train_one(cfg: dict[str, Any], seed: int, progress_bar: bool = True) -> dict
                            env_kwargs=cfg["env"], vec_env_cls=DummyVecEnv)
     model = PPO("MlpPolicy", vec_env, seed=seed, device=train_cfg.get("device", "cpu"),
                 tensorboard_log=str(Path("runs") / name), verbose=0, **cfg["ppo"])
-    callback = PeriodicEvalCallback(eval_cfg["freq"], eval_cfg["n_episodes"], eval_cfg["seed_start"],
-                                    cfg["env"], model_dir / "best_model", curve_path,
-                                    tag=f"[seed {seed}]")
+    validator = PeriodicValidator(eval_cfg["freq"], eval_cfg["n_episodes"], eval_cfg["seed_start"], cfg["env"],
+                                  curve_path, save_best=lambda: model.save(model_dir / "best_model"),
+                                  tag=f"[seed {seed}]")
+    callback = PeriodicEvalCallback(validator)
 
     log.info("Training %s seed %d for %d steps", name, seed, train_cfg["total_timesteps"])
     t0 = time.perf_counter()
@@ -133,8 +104,8 @@ def train_one(cfg: dict[str, Any], seed: int, progress_bar: bool = True) -> dict
 
     fps = train_cfg["total_timesteps"] / elapsed
     log.info("Done %s seed %d in %.1f min (%.0f steps/s incl. eval) | best val return %.1f",
-             name, seed, elapsed / 60, fps, callback.best_mean)
-    return {"seed": seed, "minutes": elapsed / 60, "fps": fps, "best_val_return": callback.best_mean}
+             name, seed, elapsed / 60, fps, validator.best_mean)
+    return {"seed": seed, "minutes": elapsed / 60, "fps": fps, "best_val_return": validator.best_mean}
 
 
 def main() -> None:
