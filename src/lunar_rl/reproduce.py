@@ -25,6 +25,7 @@ log = get_logger("reproduce")
 ALGO_CONFIGS = {"sb3_ppo": "configs/sb3_ppo.yaml", "dqn": "configs/dqn.yaml", "ppo": "configs/ppo.yaml"}
 MODEL_GLOBS = {"sb3_ppo": "models/sb3_ppo/seed_*/best_model.zip", "dqn": "models/dqn/seed_*/best_model.pt",
                "ppo": "models/ppo/seed_*/best_model.pt"}
+ALGO_BASELINES = ["dqn", "ppo"]  # from-scratch algorithms the ablations are compared with
 ABLATIONS = ["dqn_double", "dqn_no_target", "ppo_big_net", "ppo_lr_1e-4", "ppo_lr_1e-3", "ppo_gamma_0.99"]
 CURVE_FIGURES = [["dqn", "ppo", "sb3_ppo"], ["ppo", "sb3_ppo"], ["dqn", "sb3_ppo"], ["dqn"], ["ppo"], ["sb3_ppo"],
                  ["dqn", "dqn_double", "dqn_no_target"], ["ppo", "ppo_big_net", "ppo_lr_1e-4", "ppo_lr_1e-3"],
@@ -45,6 +46,8 @@ def build_stages(skip_training: bool, workers: int) -> list[tuple[str, list[str]
     stages.append(("robustness to wind", ["lunar_rl.robustness", "--workers", str(workers)]))
     ablate = ["lunar_rl.ablate", "--variants", *ABLATIONS, "--workers", str(workers)]
     stages.append(("ablations", ablate + (["--evaluate-only"] if skip_training else [])))
+    stages.append(("ablation baselines (best and final checkpoints)",
+                   ["lunar_rl.ablate", "--variants", *ALGO_BASELINES, "--evaluate-only", "--workers", str(workers)]))
     for algos in CURVE_FIGURES:
         stages.append((f"curves {' vs '.join(algos)}", ["lunar_rl.plot_curves", "--algo", *algos, "--ymin", "-800"]))
     for agent, (model, label) in GIFS.items():

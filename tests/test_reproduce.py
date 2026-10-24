@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from lunar_rl.ablate import load_suite
-from lunar_rl.reproduce import ABLATIONS, ALGO_CONFIGS, build_stages
+from lunar_rl.reproduce import ABLATIONS, ALGO_BASELINES, ALGO_CONFIGS, build_stages
 
 ROOT = Path(__file__).parents[1]
 
@@ -23,4 +23,4 @@ def test_skip_training_has_no_training_stage():
 def test_referenced_configs_and_ablations_exist():
     for config in ALGO_CONFIGS.values():
         assert (ROOT / config).exists()
-    assert set(ABLATIONS) == set(load_suite(ROOT / "configs" / "ablations.yaml"))
+    assert set(ABLATIONS) | set(ALGO_BASELINES) == set(load_suite(ROOT / "configs" / "ablations.yaml"))

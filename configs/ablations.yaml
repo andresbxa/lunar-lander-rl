@@ -2,6 +2,12 @@
 # Variants are trained on the same seeds, selected on validation and reported on test,
 # exactly like the main results. Run with: python -m lunar_rl.ablate --variants ...
 
+# Baselines are evaluated by the same runner (best and final checkpoints) so that every
+# variant is compared with numbers produced by identical code.
+baselines:
+  dqn: configs/dqn.yaml
+  ppo: configs/ppo.yaml
+
 variants:
   dqn_double:
     base: configs/dqn.yaml
